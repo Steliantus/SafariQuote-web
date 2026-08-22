@@ -1,0 +1,188 @@
+{
+  "one_andB_sossvlei": {
+    "rack": 13150,
+    "sto": 12127,
+    "label": "&Beyond lodge flight one-way (HKI ↔ Sossusvlei)",
+    "unit": "per person"
+  },
+  "ret_andB_sossvlei": {
+    "rack": 23844,
+    "sto": 22056,
+    "label": "&Beyond lodge flight return (HKI ↔ Sossusvlei)",
+    "unit": "per person"
+  },
+  "one_oka_wdh": {
+    "rack": 20552,
+    "sto": 20552,
+    "label": "Okahirongo flight one-way ↔ Windhoek",
+    "unit": "per person, min 2"
+  },
+  "one_oka_swak": {
+    "rack": 16716,
+    "sto": 16716,
+    "label": "Okahirongo flight one-way ↔ Swakopmund",
+    "unit": "per person, min 2"
+  },
+  "sossvlei_shared": {
+    "rack": 2280,
+    "sto": 2109,
+    "label": "Sossusvlei road transfer (Keerweder/Geluk, shared)",
+    "unit": "per vehicle"
+  },
+  "hki_eros": {
+    "rack": 895,
+    "sto": 827,
+    "label": "HKI ↔ Eros Airport (private transfer)",
+    "unit": "per vehicle one-way"
+  },
+  "hki_wdh": {
+    "rack": 895,
+    "sto": 827,
+    "label": "HKI ↔ Windhoek Hotels (private transfer)",
+    "unit": "per vehicle one-way"
+  },
+  "wdh_eros": {
+    "rack": 492,
+    "sto": 456,
+    "label": "Windhoek Hotels ↔ Eros Airport (private transfer)",
+    "unit": "per vehicle one-way"
+  },
+  "oka_sesfontein": {
+    "rack": 3000,
+    "sto": 3000,
+    "label": "Okahirongo ↔ Sesfontein (5hrs, per vehicle, max 3)",
+    "unit": "per vehicle"
+  },
+  "zaris_fortuner_low_1_14": {
+    "rack": 2575,
+    "sto": 2060,
+    "label": "Zaris — Toyota Fortuner 4x4 [Low season, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_fortuner_low_15": {
+    "rack": 2495,
+    "sto": 1996,
+    "label": "Zaris — Toyota Fortuner 4x4 [Low season, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_fortuner_high_1_14": {
+    "rack": 3020,
+    "sto": 2416,
+    "label": "Zaris — Toyota Fortuner 4x4 [High season, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_fortuner_high_15": {
+    "rack": 2980,
+    "sto": 2384,
+    "label": "Zaris — Toyota Fortuner 4x4 [High season, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_low_1_14": {
+    "rack": 2575,
+    "sto": 2060,
+    "label": "Zaris — Toyota Hilux Dbl Cab 4x4 [Low, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_low_15": {
+    "rack": 2495,
+    "sto": 1996,
+    "label": "Zaris — Toyota Hilux Dbl Cab 4x4 [Low, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_high_1_14": {
+    "rack": 3020,
+    "sto": 2416,
+    "label": "Zaris — Toyota Hilux Dbl Cab 4x4 [High, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_high_15": {
+    "rack": 2980,
+    "sto": 2384,
+    "label": "Zaris — Toyota Hilux Dbl Cab 4x4 [High, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_eq_low_1_14": {
+    "rack": 2795,
+    "sto": 2236,
+    "label": "Zaris — Toyota Hilux 4x4 Fully Equipped [Low, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_eq_low_15": {
+    "rack": 2705,
+    "sto": 2164,
+    "label": "Zaris — Toyota Hilux 4x4 Fully Equipped [Low, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_eq_high_1_14": {
+    "rack": 3775,
+    "sto": 3020,
+    "label": "Zaris — Toyota Hilux 4x4 Fully Equipped [High, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_hilux_eq_high_15": {
+    "rack": 3735,
+    "sto": 2988,
+    "label": "Zaris — Toyota Hilux 4x4 Fully Equipped [High, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_low_1_14": {
+    "rack": 3060,
+    "sto": 2448,
+    "label": "Zaris — Toyota Land Cruiser Dbl Cab 4x4 [Low, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_low_15": {
+    "rack": 2985,
+    "sto": 2388,
+    "label": "Zaris — Toyota Land Cruiser Dbl Cab 4x4 [Low, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_high_1_14": {
+    "rack": 3505,
+    "sto": 2804,
+    "label": "Zaris — Toyota Land Cruiser Dbl Cab 4x4 [High, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_high_15": {
+    "rack": 3465,
+    "sto": 2772,
+    "label": "Zaris — Toyota Land Cruiser Dbl Cab 4x4 [High, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_eq_low_1_14": {
+    "rack": 3300,
+    "sto": 2640,
+    "label": "Zaris — Toyota Land Cruiser 4x4 Fully Equipped [Low, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_eq_low_15": {
+    "rack": 3190,
+    "sto": 2552,
+    "label": "Zaris — Toyota Land Cruiser 4x4 Fully Equipped [Low, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_eq_high_1_14": {
+    "rack": 4265,
+    "sto": 3412,
+    "label": "Zaris — Toyota Land Cruiser 4x4 Fully Equipped [High, 1–14 days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_lc_eq_high_15": {
+    "rack": 4220,
+    "sto": 3376,
+    "label": "Zaris — Toyota Land Cruiser 4x4 Fully Equipped [High, 15+ days]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_stretch_low": {
+    "rack": 3443,
+    "sto": 3399,
+    "label": "Zaris — Toyota Land Cruiser Stretch 4x4 [Low season]",
+    "unit": "per vehicle/day"
+  },
+  "zaris_stretch_high": {
+    "rack": 3718,
+    "sto": 3686,
+    "label": "Zaris — Toyota Land Cruiser Stretch 4x4 [High season]",
+    "unit": "per vehicle/day"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "eros_std": {
+    "rack": 984,
+    "sto": 911,
+    "label": "Meet & greet Eros Airport (standard)"
+  },
+  "hki_std": {
+    "rack": 1787,
+    "sto": 1653,
+    "label": "Meet & greet HKI (standard)"
+  },
+  "eros_sd": {
+    "rack": 1967,
+    "sto": 1820,
+    "label": "Meet & greet Eros Airport (self-drive)"
+  },
+  "hki_sd": {
+    "rack": 3575,
+    "sto": 3307,
+    "label": "Meet & greet HKI (self-drive)"
+  }
+}
