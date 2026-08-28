@@ -21,7 +21,7 @@ function newStop(lodgeId) {
   };
 }
 
-export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId }) {
+export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId, isDemo }) {
   const supabase = useMemo(() => createClient(), []);
   const isLocked = quote.status === "confirmed";
 
@@ -51,16 +51,31 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
   const ensureLodgeLoaded = useCallback(
     async (lodgeId) => {
       if (!lodgeId || lodgesById[lodgeId]) return;
+      // Trial sessions read from the frozen demo dataset (a JSON file on
+      // disk) via a small API route instead of the live `lodges` table —
+      // see app/api/demo-lodge/[id]/route.js and lib/demo.js.
+      if (isDemo) {
+        const res = await fetch(`/api/demo-lodge/${encodeURIComponent(lodgeId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
+        }
+        return;
+      }
       const { data } = await supabase.from("lodges").select("id, name, data").eq("id", lodgeId).single();
       if (data) {
         setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
       }
     },
-    [supabase, lodgesById]
+    [supabase, lodgesById, isDemo]
   );
 
   const ensureMyRateLoaded = useCallback(
     async (lodgeId) => {
+      // Demo lodges already carry the flat 10% STO baked into every rate —
+      // there's no tenant_lodge_rates row for a synthetic demo lodge id, and
+      // no need for one.
+      if (isDemo) return null;
       if (!lodgeId || !tenantId || myRatesByLodge[lodgeId] !== undefined) return myRatesByLodge[lodgeId];
       const { data } = await supabase
         .from("tenant_lodge_rates")
@@ -72,7 +87,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
       setMyRatesByLodge((prev) => ({ ...prev, [lodgeId]: val }));
       return val;
     },
-    [supabase, tenantId, myRatesByLodge]
+    [supabase, tenantId, myRatesByLodge, isDemo]
   );
 
   async function handleRememberRate(lodgeId, value) {
@@ -191,11 +206,16 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
                   <div>
                     <label className="block text-xs font-medium text-neutral-600 mb-1">Check-in / Check-out</label>
                     <div className="flex gap-2">
-                      <input type="date" disabled={isLocked} value={stop.checkin || ""} onChange={(e) => updateStop(stop.key, { checkin: e.target.value })}
+                      <input type="date" disabled={isLocked} value={stop.checkin || ""}
+                        min={isDemo ? "2026-01-01" : undefined} max={isDemo ? "2026-12-31" : undefined}
+                        onChange={(e) => updateStop(stop.key, { checkin: e.target.value })}
                         className="w-full border border-neutral-300 rounded-lg px-2 py-2 text-sm" />
-                      <input type="date" disabled={isLocked} value={stop.checkout || ""} onChange={(e) => updateStop(stop.key, { checkout: e.target.value })}
+                      <input type="date" disabled={isLocked} value={stop.checkout || ""}
+                        min={isDemo ? "2026-01-01" : undefined} max={isDemo ? "2026-12-31" : undefined}
+                        onChange={(e) => updateStop(stop.key, { checkout: e.target.value })}
                         className="w-full border border-neutral-300 rounded-lg px-2 py-2 text-sm" />
                     </div>
+                    {isDemo && <p className="text-xs text-neutral-400 mt-1">Trial data covers 2026 dates only.</p>}
                   </div>
                 </div>
 
