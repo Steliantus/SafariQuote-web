@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { DEMO_EMAIL } from "@/lib/demo";
+import { DEMO_EMAIL, DEMO_TENANT_ID } from "@/lib/demo";
 
 // Public "Try SafariQuote free" entry point, linked from the marketing site
 // homepage. Collects the visitor's name / company / email for marketing
 // follow-up, then signs them straight into the one fixed demo tenant login
-// and drops them into the real dashboard, exactly as any tour operator
-// would see it.
+// and drops them into a live, empty quote in the real Quote Builder --
+// pre-loaded with the frozen demo lodge dataset -- so the trial actually
+// demonstrates the product instead of showing an empty stats dashboard.
 //
 // Security notes (read before touching this file):
 //   - startTrial() below ALWAYS authenticates as the single fixed
@@ -37,7 +38,8 @@ redirect("/trial?error=invalid");
 }
 
 let failed = false;
-try {
+  let destination = "/dashboard?demo=1";
+  try {
 const admin = createAdminClient();
 
 const { error: leadError } = await admin
@@ -59,12 +61,27 @@ token_hash: data.properties.hashed_token,
 type: "magiclink",
 });
 if (verifyError) throw verifyError;
+
+        // Drop the visitor straight into a real, working quote instead of the
+        // empty stats dashboard -- this is the actual "trial" experience: the
+        // Quote Builder opens pre-loaded with the frozen demo lodge dataset so
+        // they can immediately pick a lodge and build an itinerary. Treated as
+        // non-critical: if creating the quote fails for any reason, they still
+        // land signed-in on the dashboard rather than seeing an error.
+        const { data: quote, error: quoteError } = await admin
+          .from("quotes")
+          .insert({ tenant_id: DEMO_TENANT_ID, client_name: "New quote" })
+          .select("id")
+          .single();
+        if (!quoteError && quote?.id) {
+                destination = `/quotes/${quote.id}`;
+        }
 } catch (e) {
 console.error("Trial signup failed:", e);
 failed = true;
 }
 
-redirect(failed ? "/trial?error=unavailable" : "/dashboard?demo=1");
+  redirect(failed ? "/trial?error=unavailable" : destination);
 }
 
 export default async function TrialPage({ searchParams }) {
