@@ -22,28 +22,35 @@ import { DEMO_EMAIL } from "@/lib/demo";
 //     so unauthenticated visitors can reach it; nothing else needs to be
 //     added there for this feature to work.
 export async function GET(request) {
-  const { origin } = new URL(request.url);
+    // Use the public site origin, not request.url's origin -- on Netlify the
+  // request seen by this route can carry the deploy-specific internal
+  // hostname (e.g. <deploy-id>--safariquote-app.netlify.app) rather than
+  // the custom domain the visitor actually used. Redirecting to that origin
+  // strands the just-set auth cookie (scoped to the public domain) on a
+  // different host, so the very next request looks logged-out. See the
+  // same pattern in app/api/admin/tenants/route.js.
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
 
   try {
-    const admin = createAdminClient();
-    const { data, error: linkError } = await admin.auth.admin.generateLink({
-      type: "magiclink",
-      email: DEMO_EMAIL,
-    });
-    if (linkError || !data?.properties?.hashed_token) {
-      throw linkError || new Error("generateLink returned no hashed_token");
-    }
+        const admin = createAdminClient();
+        const { data, error: linkError } = await admin.auth.admin.generateLink({
+                type: "magiclink",
+                email: DEMO_EMAIL,
+        });
+        if (linkError || !data?.properties?.hashed_token) {
+                throw linkError || new Error("generateLink returned no hashed_token");
+        }
 
-    const supabase = await createClient();
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      token_hash: data.properties.hashed_token,
-      type: "magiclink",
-    });
-    if (verifyError) throw verifyError;
+      const supabase = await createClient();
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+                token_hash: data.properties.hashed_token,
+                type: "magiclink",
+        });
+        if (verifyError) throw verifyError;
 
-    return NextResponse.redirect(`${origin}/dashboard?demo=1`);
+      return NextResponse.redirect(`${origin}/dashboard?demo=1`);
   } catch (e) {
-    console.error("Trial auto-login failed:", e);
-    return NextResponse.redirect(`${origin}/login?error=trial_unavailable`);
+        console.error("Trial auto-login failed:", e);
+        return NextResponse.redirect(`${origin}/login?error=trial_unavailable`);
   }
 }
