@@ -12,7 +12,7 @@ export default async function TravelersPage() {
     <div>
       <h1 className="text-2xl font-semibold text-neutral-900 mb-1">Travelers</h1>
       <p className="text-sm text-neutral-500 mb-6">
-        Your own client records — private to your account. Ondjamba Safaris cannot edit these.
+        Your own client records — private to your account. SafariQuote cannot edit these.
       </p>
       <TravelersClient initialTravelers={travelers || []} />
     </div>
