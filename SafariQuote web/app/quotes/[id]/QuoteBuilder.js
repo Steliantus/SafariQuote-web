@@ -30,7 +30,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
   const [numGuests, setNumGuests] = useState((quote.guests || []).length || 2);
   const [stops, setStops] = useState(quote.stops || []);
   const [lodgesById, setLodgesById] = useState({});
-  // Your own private per-lodge STO% (from tenant_lodge_rates) — Ondjamba can't
+  // Your own private per-lodge STO% (from tenant_lodge_rates) — SafariQuote can't
   // read this table at all, so this is fetched with the regular RLS-bound
   // client, scoped to your own tenant_id only.
   const [myRatesByLodge, setMyRatesByLodge] = useState({});
@@ -283,7 +283,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
                           )}
                         </div>
                         <p className="text-xs text-neutral-400 mt-1">
-                          Private to your account — Ondjamba can&apos;t see this number.
+                          Private to your account — SafariQuote can&apos;t see this number.
                         </p>
                       </div>
                     )}
