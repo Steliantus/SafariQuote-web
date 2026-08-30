@@ -179,7 +179,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
           </div>
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Your STO discount</label>
-            <div className="px-3 py-2 text-sm text-neutral-500">{tenantStoDiscount}% (set by Ondjamba)</div>
+            <div className="px-3 py-2 text-sm text-neutral-500">{tenantStoDiscount}% (default set for trial version only)</div>
           </div>
         </div>
 
