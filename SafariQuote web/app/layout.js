@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "SafariQuote",
-  description: "Live, multi-tenant quote builder for Ondjamba Safaris and its tour-operator partners.",
+  description: "Live, multi-tenant quote builder for SafariQuote's tour-operator partners.",
 };
 
 export default function RootLayout({ children }) {
