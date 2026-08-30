@@ -70,7 +70,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="text-xs text-neutral-400 mt-6">
-          New tour-operator accounts are created by Ondjamba Safaris and sent an
+          New tour-operator accounts are created by SafariQuote and sent an
           email invite — there's no public sign-up.
         </p>
       </div>
