@@ -8,9 +8,12 @@ import { createTenantAndInvite } from "@/lib/tenantProvisioning";
 // logic as Dana's "+ Add tour operator" admin form (see
 // lib/tenantProvisioning.js).
 //
-// Guarded by a shared secret (SIGNUP_WEBHOOK_TOKEN, set in Netlify env vars)
-// the same way app/api/admin/reset-demo/route.js is -- set this same value
-// as a header on the Wix Automation's outgoing webhook call.
+// Guarded by a shared secret (SIGNUP_WEBHOOK_TOKEN, set in Netlify env vars).
+// Wix's "Send HTTP request" automation action has no custom-headers UI, so
+// the token can't be set as a header the way app/api/admin/reset-demo/route.js
+// does it -- instead the Wix Automation sends it as a "signupToken" field in
+// the JSON body. This still accepts an x-signup-token header too, in case a
+// future caller (or a manual test) can set headers.
 //
 // NOTE: the exact field names Wix's Automation sends aren't finalized yet
 // (pending the Wix-side Pay Link/Automation setup) -- this accepts a few
@@ -42,12 +45,17 @@ export async function POST(request) {
   if (!expected) {
     return NextResponse.json({ error: "SIGNUP_WEBHOOK_TOKEN is not configured" }, { status: 500 });
   }
-  const provided = request.headers.get("x-signup-token");
+
+  const body = await request.json();
+
+  // Prefer a header if one was set, but fall back to a "signupToken" body
+  // field -- Wix's Automation "Send HTTP request" action can't set custom
+  // headers, so it sends the shared secret in the body instead.
+  const provided = request.headers.get("x-signup-token") || body.signupToken;
   if (provided !== expected) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
   const companyName = pick(body, "companyName");
   const contactName = pick(body, "contactName");
   const contactEmail = pick(body, "contactEmail");
