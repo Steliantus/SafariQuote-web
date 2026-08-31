@@ -14,8 +14,24 @@ export default async function QuotePage({ params }) {
                 if (!data.user) return null;
                 const { data: p } = await supabase.from("profiles").select("tenant_id").eq("id", data.user.id).single();
                 if (!p?.tenant_id) return null;
-                const { data: t } = await supabase.from("tenants").select("sto_discount_pct").eq("id", p.tenant_id).single();
-                return { tenantId: p.tenant_id, sto_discount_pct: t?.sto_discount_pct };
+                // is_master_rate_source is only true for Ondjamba's own tenant row --
+                // see supabase/migrations/004_master_rate_source.sql. If that column
+                // hasn't been added to this database yet, this select errors and we
+                // fall back to the pre-migration query, leaving the flag `null`
+                // (unknown) rather than guessing `false` -- QuoteBuilder only applies
+                // its new rate-capping logic once it positively knows a tenant is NOT
+                // the master rate source, so an unmigrated database just behaves
+                // exactly as it did before this flag existed.
+                const { data: t, error: tErr } = await supabase
+                  .from("tenants")
+                  .select("sto_discount_pct, is_master_rate_source")
+                  .eq("id", p.tenant_id)
+                  .single();
+                if (tErr) {
+                  const { data: tFallback } = await supabase.from("tenants").select("sto_discount_pct").eq("id", p.tenant_id).single();
+                  return { tenantId: p.tenant_id, sto_discount_pct: tFallback?.sto_discount_pct, is_master_rate_source: null };
+                }
+                return { tenantId: p.tenant_id, sto_discount_pct: t?.sto_discount_pct, is_master_rate_source: t?.is_master_rate_source ?? null };
         }),
       ]);
 
@@ -38,6 +54,7 @@ export default async function QuotePage({ params }) {
       tenantStoDiscount={profile?.sto_discount_pct ?? 10}
       tenantId={profile?.tenantId || null}
       isDemo={isDemo}
+      isMasterRateSource={profile?.is_master_rate_source ?? null}
     />
           );
 }
