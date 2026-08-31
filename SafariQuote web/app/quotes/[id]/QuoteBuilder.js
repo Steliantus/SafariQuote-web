@@ -21,7 +21,7 @@ function newStop(lodgeId) {
   };
 }
 
-export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId, isDemo }) {
+export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId, isDemo, isMasterRateSource }) {
   const supabase = useMemo(() => createClient(), []);
   const isLocked = quote.status === "confirmed";
 
@@ -50,7 +50,8 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
 
   const ensureLodgeLoaded = useCallback(
     async (lodgeId) => {
-      if (!lodgeId || lodgesById[lodgeId]) return;
+      if (!lodgeId) return null;
+      if (lodgesById[lodgeId]) return lodgesById[lodgeId];
       // Trial sessions read from the frozen demo dataset (a JSON file on
       // disk) via a small API route instead of the live `lodges` table —
       // see app/api/demo-lodge/[id]/route.js and lib/demo.js.
@@ -59,13 +60,16 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
         if (res.ok) {
           const data = await res.json();
           setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
+          return data.data;
         }
-        return;
+        return null;
       }
       const { data } = await supabase.from("lodges").select("id, name, data").eq("id", lodgeId).single();
       if (data) {
         setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
+        return data.data;
       }
+      return null;
     },
     [supabase, lodgesById, isDemo]
   );
@@ -122,9 +126,26 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
 
   async function handleLodgeChange(key, lodgeId) {
     updateStop(key, { lodgeId, roomIndex: 0, seasonId: null, selectedActivityIds: [], stoDiscOverride: null });
-    await ensureLodgeLoaded(lodgeId);
+    const lodge = await ensureLodgeLoaded(lodgeId);
     const myRate = await ensureMyRateLoaded(lodgeId);
-    if (myRate != null) updateStop(key, { stoDiscOverride: myRate });
+    if (myRate != null) {
+      // You've negotiated and saved your own rate at this lodge before — use it.
+      updateStop(key, { stoDiscOverride: myRate });
+    } else if (!isDemo && isMasterRateSource === false && lodge) {
+      // No standing rate on file. `lodge.stoDisc` here is Ondjamba's own
+      // contracted rate with this property, sent to us directly by the
+      // lodge — it isn't yours to use by default. Cap the default shown to
+      // your account's negotiated ceiling (tenantStoDiscount), and never
+      // *above* the lodge's own stated rate (e.g. a lodge stated at 0%
+      // stays 0% for everyone, not just Ondjamba).
+      // isMasterRateSource is `null` (not `false`) until the DB migration
+      // adding this flag has run — checking `=== false` strictly means this
+      // capping only ever activates once we positively know the tenant
+      // isn't Ondjamba, so nothing changes for anyone until then.
+      const lodgeDefault = typeof lodge.stoDisc === "number" ? lodge.stoDisc : 20;
+      const capped = Math.min(lodgeDefault, tenantStoDiscount);
+      updateStop(key, { stoDiscOverride: capped });
+    }
   }
 
   async function handleSave(nextStatus) {
@@ -179,7 +200,13 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
           </div>
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Your STO discount</label>
-            <div className="px-3 py-2 text-sm text-neutral-500">{tenantStoDiscount}% (default set for trial version only)</div>
+            <div className="px-3 py-2 text-sm text-neutral-500">
+              {isDemo
+                ? `${tenantStoDiscount}% (fixed for the trial — a real account negotiates its own rate per lodge)`
+                : isMasterRateSource === true
+                ? "Uses each lodge's own contracted rate directly"
+                : `${tenantStoDiscount}% default ceiling — capped to each lodge's own rate where it's lower. Set your own per lodge below, or on the My Rates page.`}
+            </div>
           </div>
         </div>
 
