@@ -33,8 +33,8 @@ const EDIT_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF9C
 const EXAMPLE_FONT = { italic: true, color: { argb: "FF9CA3AF" } };
 
 function effectiveDefault(lodgeStoDisc, tenantCapPct) {
-    const lodgeRate = typeof lodgeStoDisc === "number" ? lodgeStoDisc : 20;
-    return Math.min(lodgeRate, tenantCapPct);
+  const lodgeRate = typeof lodgeStoDisc === "number" ? lodgeStoDisc : 20;
+  return Math.min(lodgeRate, tenantCapPct);
 }
 
 /**
@@ -45,103 +45,103 @@ function effectiveDefault(lodgeStoDisc, tenantCapPct) {
  * @param {string} companyName
  */
 export async function buildStoRatesWorkbook({ lodges, myRates, tenantCapPct, companyName }) {
-    const wb = new ExcelJS.Workbook();
-    wb.creator = "SafariQuote";
-    wb.created = new Date();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "SafariQuote";
+  wb.created = new Date();
 
   // ---- Instructions ---------------------------------------------------
   const info = wb.addWorksheet(INSTRUCTIONS_SHEET);
-    info.columns = [{ width: 100 }];
-    const lines = [
-          `${companyName} — My STO Rates`,
-          "",
-          `The "${STO_SHEET}" tab lists every lodge in SafariQuote with your default STO% already filled in — the ` +
-            "lowest of that lodge's own stated rate and your account's negotiated ceiling, so a lodge stated at 0% " +
-            "stays at 0% and nothing is ever filled in higher than your ceiling.",
-          "",
-          'Only edit the "Your STO %" column, and only where you have a better negotiated rate with that lodge — ' +
-            "leave everything else at the default that's already filled in.",
-          "",
-          "Activities are listed for context only — there's no separate rate to set for them.",
-          "",
-          `Do not edit or delete the hidden "Lodge ID" column (column A) — it's how we match your changes back to ` +
-            "the right lodge when you upload this file again.",
-          "",
-          `Use up a lodge you work with that isn't listed? Add it on the "${NEW_LODGES_SHEET}" tab instead — it goes ` +
-            "to our team to add properly (rooms, seasons, real rates) rather than straight onto your account.",
-          "",
-          "When you're done, save the file and upload it again on the My Rates page — it will pick up every change.",
-        ];
-    lines.forEach((text, i) => {
-          const row = info.getRow(i + 1);
-          row.getCell(1).value = text;
-          row.getCell(1).alignment = { wrapText: true, vertical: "top" };
-          if (i === 0) row.getCell(1).font = { bold: true, size: 14 };
-    });
+  info.columns = [{ width: 100 }];
+  const lines = [
+    `${companyName} — My STO Rates`,
+    "",
+    `The "${STO_SHEET}" tab lists every lodge in SafariQuote with your default STO% already filled in — the ` +
+      "lowest of that lodge's own stated rate and your account's negotiated ceiling, so a lodge stated at 0% " +
+      "stays at 0% and nothing is ever filled in higher than your ceiling.",
+    "",
+    'Only edit the "Your STO %" column, and only where you have a better negotiated rate with that lodge — ' +
+      "leave everything else at the default that's already filled in.",
+    "",
+    "Activities are listed for context only — there's no separate rate to set for them.",
+    "",
+    `Do not edit or delete the hidden "Lodge ID" column (column A) — it's how we match your changes back to ` +
+      "the right lodge when you upload this file again.",
+    "",
+    `Use up a lodge you work with that isn't listed? Add it on the "${NEW_LODGES_SHEET}" tab instead — it goes ` +
+      "to our team to add properly (rooms, seasons, real rates) rather than straight onto your account.",
+    "",
+    "When you're done, save the file and upload it again on the My Rates page — it will pick up every change.",
+  ];
+  lines.forEach((text, i) => {
+    const row = info.getRow(i + 1);
+    row.getCell(1).value = text;
+    row.getCell(1).alignment = { wrapText: true, vertical: "top" };
+    if (i === 0) row.getCell(1).font = { bold: true, size: 14 };
+  });
 
   // ---- STO Rates --------------------------------------------------------
   const sheet = wb.addWorksheet(STO_SHEET, { views: [{ state: "frozen", ySplit: 1 }] });
-    sheet.columns = [
-      { header: "Lodge ID", key: "id", width: 12 },
-      { header: "Lodge Name", key: "name", width: 38 },
-      { header: "Region", key: "region", width: 20 },
-      { header: "Activities at this lodge (for context only)", key: "activities", width: 55 },
-      { header: "Your STO %", key: "rate", width: 14 },
-        ];
-    sheet.getRow(1).eachCell((cell) => {
-          cell.fill = HEADER_FILL;
-          cell.font = HEADER_FONT;
-    });
-    sheet.getColumn(1).hidden = true;
+  sheet.columns = [
+    { header: "Lodge ID", key: "id", width: 12 },
+    { header: "Lodge Name", key: "name", width: 38 },
+    { header: "Region", key: "region", width: 20 },
+    { header: "Activities at this lodge (for context only)", key: "activities", width: 55 },
+    { header: "Your STO %", key: "rate", width: 14 },
+  ];
+  sheet.getRow(1).eachCell((cell) => {
+    cell.fill = HEADER_FILL;
+    cell.font = HEADER_FONT;
+  });
+  sheet.getColumn(1).hidden = true;
 
   lodges.forEach((lodge) => {
-        const saved = myRates.get(lodge.id);
-        const value = saved != null ? saved : effectiveDefault(lodge.sto_disc, tenantCapPct);
-        const activityNames = (lodge.activities || []).map((a) => a.label).filter(Boolean).join(", ");
-        const row = sheet.addRow({
-                id: lodge.id,
-                name: lodge.name,
-                region: lodge.region || "",
-                activities: activityNames,
-                rate: Math.round(value * 10) / 10,
-        });
-        const rateCell = row.getCell(5);
-        rateCell.fill = EDIT_FILL;
-        rateCell.numFmt = "0.0";
-        rateCell.dataValidation = {
-                type: "decimal",
-                operator: "between",
-                formulae: [0, 100],
-                showErrorMessage: true,
-                errorTitle: "Invalid STO %",
-                error: "Enter a number between 0 and 100.",
-        };
-        row.getCell(4).alignment = { wrapText: true };
+    const saved = myRates.get(lodge.id);
+    const value = saved != null ? saved : effectiveDefault(lodge.sto_disc, tenantCapPct);
+    const activityNames = (lodge.activities || []).map((a) => a.label).filter(Boolean).join(", ");
+    const row = sheet.addRow({
+      id: lodge.id,
+      name: lodge.name,
+      region: lodge.region || "",
+      activities: activityNames,
+      rate: Math.round(value * 10) / 10,
+    });
+    const rateCell = row.getCell(5);
+    rateCell.fill = EDIT_FILL;
+    rateCell.numFmt = "0.0";
+    rateCell.dataValidation = {
+      type: "decimal",
+      operator: "between",
+      formulae: [0, 100],
+      showErrorMessage: true,
+      errorTitle: "Invalid STO %",
+      error: "Enter a number between 0 and 100.",
+    };
+    row.getCell(4).alignment = { wrapText: true };
   });
 
   // ---- Add New Lodges -----------------------------------------------------
   const newSheet = wb.addWorksheet(NEW_LODGES_SHEET);
-    newSheet.columns = [
-      { header: "Lodge Name", key: "name", width: 38 },
-      { header: "Region", key: "region", width: 20 },
-      { header: "Your STO %", key: "rate", width: 14 },
-      { header: "Notes (contact, why you're using it, etc.)", key: "notes", width: 45 },
-        ];
-    newSheet.getRow(1).eachCell((cell) => {
-          cell.fill = HEADER_FILL;
-          cell.font = HEADER_FONT;
-    });
-    const exampleRow = newSheet.addRow({
-          name: EXAMPLE_LODGE_NAME,
-          region: "Erongo",
-          rate: 15,
-          notes: "This row is just an example of the expected format — overwrite or delete it.",
-    });
-    exampleRow.eachCell((cell) => (cell.font = EXAMPLE_FONT));
-    for (let i = 0; i < NEW_LODGE_TEMPLATE_ROWS; i++) {
-          const row = newSheet.addRow({});
-          [1, 2, 3, 4].forEach((c) => (row.getCell(c).fill = EDIT_FILL));
-    }
+  newSheet.columns = [
+    { header: "Lodge Name", key: "name", width: 38 },
+    { header: "Region", key: "region", width: 20 },
+    { header: "Your STO %", key: "rate", width: 14 },
+    { header: "Notes (contact, why you're using it, etc.)", key: "notes", width: 45 },
+  ];
+  newSheet.getRow(1).eachCell((cell) => {
+    cell.fill = HEADER_FILL;
+    cell.font = HEADER_FONT;
+  });
+  const exampleRow = newSheet.addRow({
+    name: EXAMPLE_LODGE_NAME,
+    region: "Erongo",
+    rate: 15,
+    notes: "This row is just an example of the expected format — overwrite or delete it.",
+  });
+  exampleRow.eachCell((cell) => (cell.font = EXAMPLE_FONT));
+  for (let i = 0; i < NEW_LODGE_TEMPLATE_ROWS; i++) {
+    const row = newSheet.addRow({});
+    [1, 2, 3, 4].forEach((c) => (row.getCell(c).fill = EDIT_FILL));
+  }
 
   wb.views = [{ activeTab: 1 }]; // open on "STO Rates", not the instructions
 
@@ -153,51 +153,51 @@ export async function buildStoRatesWorkbook({ lodges, myRates, tenantCapPct, com
  * Returns { rateEdits: [{lodgeId, stoDisc}], newLodges: [{lodgeName, region, stoDisc, notes}], errors: [string] }
  */
 export async function parseStoRatesWorkbook(buffer) {
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buffer);
-    const errors = [];
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const errors = [];
 
   const rateEdits = [];
-    const sheet = wb.getWorksheet(STO_SHEET);
-    if (!sheet) {
-          errors.push(`Missing "${STO_SHEET}" sheet — did you upload the right file?`);
-    } else {
-          sheet.eachRow((row, rowNumber) => {
-                  if (rowNumber === 1) return; // header
-                              const lodgeId = row.getCell(1).value;
-                  const rawRate = row.getCell(5).value;
-                  if (!lodgeId || rawRate == null || rawRate === "") return;
-                            const rate = Number(rawRate);
-                  if (Number.isNaN(rate) || rate < 0 || rate > 100) {
-                            errors.push(`Row ${rowNumber}: "${rawRate}" isn't a valid STO % (0–100) — skipped.`);
-                            return;
-                  }
-                  rateEdits.push({ lodgeId: String(lodgeId).trim(), stoDisc: rate });
-          });
-    }
+  const sheet = wb.getWorksheet(STO_SHEET);
+  if (!sheet) {
+    errors.push(`Missing "${STO_SHEET}" sheet — did you upload the right file?`);
+  } else {
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // header
+      const lodgeId = row.getCell(1).value;
+      const rawRate = row.getCell(5).value;
+      if (!lodgeId || rawRate == null || rawRate === "") return;
+      const rate = Number(rawRate);
+      if (Number.isNaN(rate) || rate < 0 || rate > 100) {
+        errors.push(`Row ${rowNumber}: "${rawRate}" isn't a valid STO % (0–100) — skipped.`);
+        return;
+      }
+      rateEdits.push({ lodgeId: String(lodgeId).trim(), stoDisc: rate });
+    });
+  }
 
   const newLodges = [];
-    const newSheet = wb.getWorksheet(NEW_LODGES_SHEET);
-    if (newSheet) {
-          newSheet.eachRow((row, rowNumber) => {
-                  if (rowNumber === 1) return; // header
-                                 const name = row.getCell(1).value;
-                  if (!name || String(name).trim() === "" || String(name).trim() === EXAMPLE_LODGE_NAME) return;
-                  const region = row.getCell(2).value;
-                  const rawRate = row.getCell(3).value;
-                  const notes = row.getCell(4).value;
-                  const rate = rawRate == null || rawRate === "" ? null : Number(rawRate);
-                  if (rate != null && (Number.isNaN(rate) || rate < 0 || rate > 100)) {
-                            errors.push(`"${name}" (Add New Lodges, row ${rowNumber}): "${rawRate}" isn't a valid STO % — saved without a rate.`);
-                  }
-                  newLodges.push({
-                            lodgeName: String(name).trim(),
-                            region: region ? String(region).trim() : null,
-                            stoDisc: rate != null && !Number.isNaN(rate) ? rate : null,
-                            notes: notes ? String(notes).trim() : null,
-                  });
-          });
-    }
+  const newSheet = wb.getWorksheet(NEW_LODGES_SHEET);
+  if (newSheet) {
+    newSheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // header
+      const name = row.getCell(1).value;
+      if (!name || String(name).trim() === "" || String(name).trim() === EXAMPLE_LODGE_NAME) return;
+      const region = row.getCell(2).value;
+      const rawRate = row.getCell(3).value;
+      const notes = row.getCell(4).value;
+      const rate = rawRate == null || rawRate === "" ? null : Number(rawRate);
+      if (rate != null && (Number.isNaN(rate) || rate < 0 || rate > 100)) {
+        errors.push(`"${name}" (Add New Lodges, row ${rowNumber}): "${rawRate}" isn't a valid STO % — saved without a rate.`);
+      }
+      newLodges.push({
+        lodgeName: String(name).trim(),
+        region: region ? String(region).trim() : null,
+        stoDisc: rate != null && !Number.isNaN(rate) ? rate : null,
+        notes: notes ? String(notes).trim() : null,
+      });
+    });
+  }
 
   return { rateEdits, newLodges, errors };
 }
