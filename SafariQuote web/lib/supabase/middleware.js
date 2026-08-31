@@ -39,7 +39,8 @@ export async function updateSession(request) {
                                                                                             pathname === "/set-password" ||
                                                                                             pathname === "/" ||
                                                                                             pathname.startsWith("/auth") ||
-                                                                                            pathname === "/trial"; // public instant-trial auto-login, see app/trial/route.js
+                                                                                            pathname === "/trial" || // public instant-trial auto-login, see app/trial/route.js
+                                                                                            pathname === "/signup"; // public paid-signup form, see app/signup/page.js
 
   if (!user && !isPublic) {
                 const url = request.nextUrl.clone();
