@@ -15,6 +15,7 @@ export default async function AdminLayout({ children }) {
               <Link href="/admin" className="hover:text-white">Dashboard</Link>
               <Link href="/admin/tenants" className="hover:text-white">Tour Operators</Link>
               <Link href="/admin/lodges" className="hover:text-white">Lodges & Rates</Link>
+              <Link href="/admin/lodge-submissions" className="hover:text-white">Lodge Submissions</Link>
             </nav>
           </div>
           <div className="flex items-center gap-4 text-sm text-neutral-300">
