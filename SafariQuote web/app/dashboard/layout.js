@@ -7,9 +7,19 @@ import SignOutButton from "@/components/SignOutButton";
 export default async function TenantLayout({ children }) {
     const profile = await requireUser();
     const supabase = await createClient();
-    const { data: tenant } = profile.tenant_id
-      ? await supabase.from("tenants").select("company_name").eq("id", profile.tenant_id).single()
-          : { data: null };
+    let tenant = null;
+    if (profile.tenant_id) {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("company_name, is_master_rate_source")
+        .eq("id", profile.tenant_id)
+        .single();
+      // is_master_rate_source may not exist yet (migration 004 pending) --
+      // fall back rather than breaking every tenant's page header over it.
+      tenant = error
+        ? (await supabase.from("tenants").select("company_name").eq("id", profile.tenant_id).single()).data
+        : data;
+    }
     const isDemo = isDemoTenant(profile.tenant_id);
 
   return (
@@ -27,7 +37,7 @@ export default async function TenantLayout({ children }) {
                       <Link href="/dashboard" className="hover:text-white">Dashboard</Link>
               <Link href="/quotes" className="hover:text-white">Quotes</Link>
               <Link href="/travelers" className="hover:text-white">Travelers</Link>
-{!isDemo && <Link href="/my-rates" className="hover:text-white">My Rates</Link>}
+{!isDemo && !tenant?.is_master_rate_source && <Link href="/my-rates" className="hover:text-white">My Rates</Link>}
   </nav>
   </div>
            <div className="flex items-center gap-4 text-sm text-neutral-300">
