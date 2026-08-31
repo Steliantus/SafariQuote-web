@@ -17,6 +17,12 @@ import { createTenantAndInvite } from "@/lib/tenantProvisioning";
 // likely spellings per field so it isn't brittle to that choice, but double
 // check against the real payload once the Automation is wired up and adjust
 // FIELD_ALIASES below if needed.
+//
+// Wix Pay Links typically only reliably capture the payer's email, not a
+// company name or phone number. So whatever Wix's payload is missing gets
+// backfilled from pending_signups -- the row the visitor's own /signup form
+// (app/signup/page.js) created before being sent to Wix to pay, matched by
+// contact email. That row is deleted once it's been consumed here.
 const FIELD_ALIASES = {
   companyName: ["companyName", "company_name", "company", "businessName", "business_name"],
   contactName: ["contactName", "contact_name", "name", "fullName", "full_name", "buyerName"],
@@ -61,16 +67,43 @@ export async function POST(request) {
     return NextResponse.json({ tenant: existing, alreadyExisted: true });
   }
 
+  // Fill in whatever Wix's payload didn't send from the visitor's own
+  // /signup form submission, if there is one.
+  let pendingSignupId = null;
+  let finalCompanyName = companyName;
+  let finalContactName = contactName;
+  let finalPhone = phone;
+  if (!finalCompanyName || !finalContactName || !finalPhone) {
+    const { data: pending } = await admin
+      .from("pending_signups")
+      .select("id, company_name, contact_name, phone")
+      .eq("contact_email", contactEmail)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (pending) {
+      pendingSignupId = pending.id;
+      finalCompanyName = finalCompanyName || pending.company_name;
+      finalContactName = finalContactName || pending.contact_name;
+      finalPhone = finalPhone || pending.phone;
+    }
+  }
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
 
   let tenant, inviteError;
   try {
     ({ tenant, inviteError } = await createTenantAndInvite(
-      { companyName: companyName || contactEmail, contactName, contactEmail, phone },
+      { companyName: finalCompanyName || contactEmail, contactName: finalContactName, contactEmail, phone: finalPhone },
       { siteUrl }
     ));
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: e.status || 500 });
+  }
+
+  // Best-effort cleanup -- a failure here shouldn't fail the signup itself.
+  if (pendingSignupId) {
+    await admin.from("pending_signups").delete().eq("id", pendingSignupId);
   }
 
   if (inviteError) {
