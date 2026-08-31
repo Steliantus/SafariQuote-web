@@ -70,8 +70,11 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="text-xs text-neutral-400 mt-6">
-          New tour-operator accounts are created by SafariQuote and sent an
-          email invite — there's no public sign-up.
+          New here?{" "}
+          <a href="/signup" className="text-neutral-700 underline">
+            Sign up
+          </a>{" "}
+          to set up a tour-operator account.
         </p>
       </div>
     </div>
