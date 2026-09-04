@@ -3,6 +3,10 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeQuote, fmtNAD } from "@/lib/pricing";
+import { emptyExtras } from "@/lib/extras";
+import CarHirePicker from "./CarHirePicker";
+import ExtrasPanel from "./ExtrasPanel";
+import { downloadQuotePdf } from "./quotePdf";
 
 function newStop(lodgeId) {
   return {
@@ -18,10 +22,11 @@ function newStop(lodgeId) {
     paxOverride: null,
     selectedActivityIds: [],
     stoDiscOverride: null,
+    carHire: null,
   };
 }
 
-export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId, isDemo }) {
+export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId, isDemo, isMasterRateSource, companyName }) {
   const supabase = useMemo(() => createClient(), []);
   const isLocked = quote.status === "confirmed";
 
@@ -29,28 +34,20 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
   const [travelerId, setTravelerId] = useState(quote.traveler_id || "");
   const [numGuests, setNumGuests] = useState((quote.guests || []).length || 2);
   const [stops, setStops] = useState(quote.stops || []);
+  const [extras, setExtras] = useState({ ...emptyExtras(), ...(quote.extras || {}) });
+  const [exporting, setExporting] = useState(false);
   const [lodgesById, setLodgesById] = useState({});
-  // Your own private per-lodge STO% (from tenant_lodge_rates) — Ondjamba can't
+  // Your own private per-lodge STO% (from tenant_lodge_rates) — SafariQuote can't
   // read this table at all, so this is fetched with the regular RLS-bound
   // client, scoped to your own tenant_id only.
   const [myRatesByLodge, setMyRatesByLodge] = useState({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Preload lodges (and your own saved rates for them) already referenced by
-  // this quote's saved stops.
-  useEffect(() => {
-    const ids = [...new Set((quote.stops || []).map((s) => s.lodgeId).filter(Boolean))];
-    ids.forEach((id) => {
-      ensureLodgeLoaded(id);
-      ensureMyRateLoaded(id);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const ensureLodgeLoaded = useCallback(
     async (lodgeId) => {
-      if (!lodgeId || lodgesById[lodgeId]) return;
+      if (!lodgeId) return null;
+      if (lodgesById[lodgeId]) return lodgesById[lodgeId];
       // Trial sessions read from the frozen demo dataset (a JSON file on
       // disk) via a small API route instead of the live `lodges` table —
       // see app/api/demo-lodge/[id]/route.js and lib/demo.js.
@@ -59,13 +56,16 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
         if (res.ok) {
           const data = await res.json();
           setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
+          return data.data;
         }
-        return;
+        return null;
       }
       const { data } = await supabase.from("lodges").select("id, name, data").eq("id", lodgeId).single();
       if (data) {
         setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
+        return data.data;
       }
+      return null;
     },
     [supabase, lodgesById, isDemo]
   );
@@ -90,6 +90,17 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
     [supabase, tenantId, myRatesByLodge, isDemo]
   );
 
+  // Preload lodges (and your own saved rates for them) already referenced by
+  // this quote's saved stops.
+  useEffect(() => {
+    const ids = [...new Set((quote.stops || []).map((s) => s.lodgeId).filter(Boolean))];
+    ids.forEach((id) => {
+      ensureLodgeLoaded(id);
+      ensureMyRateLoaded(id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleRememberRate(lodgeId, value) {
     if (!tenantId || !lodgeId || value == null || Number.isNaN(value)) return;
     const { error } = await supabase
@@ -105,8 +116,8 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
 
   const computed = useMemo(() => {
     if (isLocked) return quote.computed_snapshot;
-    return computeQuote({ guests, stops }, lodgesById);
-  }, [isLocked, quote.computed_snapshot, guests, stops, lodgesById]);
+    return computeQuote({ guests, stops, extras }, lodgesById);
+  }, [isLocked, quote.computed_snapshot, guests, stops, extras, lodgesById]);
 
   function addStop() {
     setStops((s) => [...s, newStop(null)]);
@@ -122,9 +133,26 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
 
   async function handleLodgeChange(key, lodgeId) {
     updateStop(key, { lodgeId, roomIndex: 0, seasonId: null, selectedActivityIds: [], stoDiscOverride: null });
-    await ensureLodgeLoaded(lodgeId);
+    const lodge = await ensureLodgeLoaded(lodgeId);
     const myRate = await ensureMyRateLoaded(lodgeId);
-    if (myRate != null) updateStop(key, { stoDiscOverride: myRate });
+    if (myRate != null) {
+      // You've negotiated and saved your own rate at this lodge before — use it.
+      updateStop(key, { stoDiscOverride: myRate });
+    } else if (!isDemo && isMasterRateSource === false && lodge) {
+      // No standing rate on file. `lodge.stoDisc` here is Ondjamba's own
+      // contracted rate with this property, sent to us directly by the
+      // lodge — it isn't yours to use by default. Cap the default shown to
+      // your account's negotiated ceiling (tenantStoDiscount), and never
+      // *above* the lodge's own stated rate (e.g. a lodge stated at 0%
+      // stays 0% for everyone, not just Ondjamba).
+      // isMasterRateSource is `null` (not `false`) until the DB migration
+      // adding this flag has run — checking `=== false` strictly means this
+      // capping only ever activates once we positively know the tenant
+      // isn't Ondjamba, so nothing changes for anyone until then.
+      const lodgeDefault = typeof lodge.stoDisc === "number" ? lodge.stoDisc : 20;
+      const capped = Math.min(lodgeDefault, tenantStoDiscount);
+      updateStop(key, { stoDiscOverride: capped });
+    }
   }
 
   async function handleSave(nextStatus) {
@@ -135,6 +163,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
       traveler_id: travelerId || null,
       guests,
       stops: stops.map(({ key, ...rest }) => rest), // strip client-only React key
+      extras,
     };
     if (nextStatus === "confirmed") {
       payload.status = "confirmed";
@@ -145,6 +174,46 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
     setSaving(false);
     if (error) setMessage(`Error: ${error.message}`);
     else setMessage(nextStatus === "confirmed" ? "Confirmed — price is now locked." : "Draft saved.");
+  }
+
+  function handleDownloadPdf() {
+    if (!computed || !computed.rackTotal) {
+      setMessage("Add at least one priced stop before downloading a PDF.");
+      return;
+    }
+    downloadQuotePdf({ computed, clientName, numGuests, stops, companyName: isDemo ? "" : companyName });
+  }
+
+  async function handleExportExcel() {
+    if (!computed || !computed.rackTotal) {
+      setMessage("Add at least one priced stop before exporting to Excel.");
+      return;
+    }
+    setExporting(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/quotes/${quote.id}/export-xlsx`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match ? match[1] : "SafariQuote.xlsx";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -179,7 +248,13 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
           </div>
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Your STO discount</label>
-            <div className="px-3 py-2 text-sm text-neutral-500">{tenantStoDiscount}% (set by Ondjamba)</div>
+            <div className="px-3 py-2 text-sm text-neutral-500">
+              {isDemo
+                ? `${tenantStoDiscount}% (fixed for the trial — a real account negotiates its own rate per lodge)`
+                : isMasterRateSource === true
+                ? "Uses each lodge's own contracted rate directly"
+                : `${tenantStoDiscount}% default ceiling — capped to each lodge's own rate where it's lower. Set your own per lodge below, or on the My Rates page.`}
+            </div>
           </div>
         </div>
 
@@ -283,7 +358,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
                           )}
                         </div>
                         <p className="text-xs text-neutral-400 mt-1">
-                          Private to your account — Ondjamba can&apos;t see this number.
+                          Private to your account — SafariQuote can&apos;t see this number.
                         </p>
                       </div>
                     )}
@@ -310,6 +385,27 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
                         </div>
                       </div>
                     )}
+
+                    <div className="mt-3 pt-3 border-t border-neutral-100">
+                      {stop.carHire ? (
+                        <CarHirePicker
+                          value={stop.carHire}
+                          disabled={isLocked}
+                          onChange={(next) => updateStop(stop.key, { carHire: next })}
+                          onRemove={() => updateStop(stop.key, { carHire: null })}
+                        />
+                      ) : (
+                        !isLocked && (
+                          <button
+                            type="button"
+                            onClick={() => updateStop(stop.key, { carHire: {} })}
+                            className="text-xs text-neutral-500 border border-dashed border-neutral-300 rounded-lg px-3 py-1.5 hover:bg-neutral-50"
+                          >
+                            + Add car hire for this stop
+                          </button>
+                        )
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -322,6 +418,8 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
             + Add stop
           </button>
         )}
+
+        <ExtrasPanel extras={extras} onChange={setExtras} isLocked={isLocked} numGuests={numGuests} />
       </div>
 
       <div className="col-span-1">
@@ -334,9 +432,13 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
               {computed.lines.map((line, i) =>
                 line.stopSec ? (
                   <div key={i} className="text-xs font-semibold text-neutral-400 uppercase pt-2">{line.label}</div>
+                ) : line.sec ? (
+                  <div key={i} className="text-xs font-semibold text-neutral-500 uppercase pt-3 border-t border-neutral-100">{line.sec}</div>
+                ) : line.zero ? (
+                  <div key={i} className="text-xs text-neutral-400 italic">{line.label}</div>
                 ) : (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-neutral-600">{line.label}<br /><span className="text-xs text-neutral-400">{line.detail}</span></span>
+                    <span className="text-neutral-600">{line.label}{line.detail && <><br /><span className="text-xs text-neutral-400">{line.detail}</span></>}</span>
                     <span className="text-neutral-900 font-medium whitespace-nowrap">{fmtNAD(line.sto)}</span>
                   </div>
                 )
@@ -351,6 +453,23 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
               <span>Client total (STO)</span><span>{fmtNAD(computed?.stoTotal || 0)}</span>
             </div>
           </div>
+          <div className="mt-5 pt-4 border-t border-neutral-200 space-y-2">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={!computed?.rackTotal}
+              className="w-full border border-neutral-300 text-neutral-700 text-sm py-2 rounded-lg disabled:opacity-40"
+            >
+              Download PDF (client quote)
+            </button>
+            <button
+              onClick={handleExportExcel}
+              disabled={!computed?.rackTotal || exporting}
+              className="w-full border border-neutral-300 text-neutral-700 text-sm py-2 rounded-lg disabled:opacity-40"
+            >
+              {exporting ? "Preparing…" : "Export to Excel (rack + STO)"}
+            </button>
+          </div>
+
           {!isLocked ? (
             <div className="mt-5 space-y-2">
               <button onClick={() => handleSave("draft")} disabled={saving}
@@ -364,7 +483,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
             </div>
           ) : (
             <p className="text-xs text-neutral-400 mt-4">
-              Confirmed {quote.confirmed_at ? new Date(quote.confirmed_at).toLocaleDateString() : ""} — price is locked and won't change if lodge rates update later.
+              Confirmed {quote.confirmed_at ? new Date(quote.confirmed_at).toLocaleDateString() : ""} — price is locked and won&apos;t change if lodge rates update later.
             </p>
           )}
           {message && <p className="text-xs text-neutral-500 mt-3">{message}</p>}
