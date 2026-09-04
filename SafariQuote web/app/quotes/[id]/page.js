@@ -32,14 +32,14 @@ export default async function QuotePage({ params }) {
                 // exactly as it did before this flag existed.
                 const { data: t, error: tErr } = await supabase
                   .from("tenants")
-                  .select("sto_discount_pct, is_master_rate_source")
+                  .select("sto_discount_pct, is_master_rate_source, company_name")
                   .eq("id", p.tenant_id)
                   .single();
                 if (tErr) {
-                  const { data: tFallback } = await supabase.from("tenants").select("sto_discount_pct").eq("id", p.tenant_id).single();
-                  return { tenantId: p.tenant_id, sto_discount_pct: tFallback?.sto_discount_pct, is_master_rate_source: null };
+                  const { data: tFallback } = await supabase.from("tenants").select("sto_discount_pct, company_name").eq("id", p.tenant_id).single();
+                  return { tenantId: p.tenant_id, sto_discount_pct: tFallback?.sto_discount_pct, is_master_rate_source: null, company_name: tFallback?.company_name || "" };
                 }
-                return { tenantId: p.tenant_id, sto_discount_pct: t?.sto_discount_pct, is_master_rate_source: t?.is_master_rate_source ?? null };
+                return { tenantId: p.tenant_id, sto_discount_pct: t?.sto_discount_pct, is_master_rate_source: t?.is_master_rate_source ?? null, company_name: t?.company_name || "" };
         }),
       ]);
 
@@ -63,6 +63,7 @@ export default async function QuotePage({ params }) {
       tenantId={profile?.tenantId || null}
       isDemo={isDemo}
       isMasterRateSource={profile?.is_master_rate_source ?? null}
+      companyName={isDemo ? "" : profile?.company_name || ""}
     />
           );
 }

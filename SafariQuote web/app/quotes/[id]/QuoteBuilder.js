@@ -3,6 +3,10 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeQuote, fmtNAD } from "@/lib/pricing";
+import { emptyExtras } from "@/lib/extras";
+import CarHirePicker from "./CarHirePicker";
+import ExtrasPanel from "./ExtrasPanel";
+import { downloadQuotePdf } from "./quotePdf";
 
 function newStop(lodgeId) {
   return {
@@ -21,7 +25,7 @@ function newStop(lodgeId) {
   };
 }
 
-export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId, isDemo, isMasterRateSource }) {
+export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDiscount, tenantId, isDemo, isMasterRateSource, companyName }) {
   const supabase = useMemo(() => createClient(), []);
   const isLocked = quote.status === "confirmed";
 
@@ -29,6 +33,8 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
   const [travelerId, setTravelerId] = useState(quote.traveler_id || "");
   const [numGuests, setNumGuests] = useState((quote.guests || []).length || 2);
   const [stops, setStops] = useState(quote.stops || []);
+  const [extras, setExtras] = useState(quote.extras && Object.keys(quote.extras).length ? quote.extras : emptyExtras());
+  const [exporting, setExporting] = useState(false);
   const [lodgesById, setLodgesById] = useState({});
   // Your own private per-lodge STO% (from tenant_lodge_rates) — SafariQuote can't
   // read this table at all, so this is fetched with the regular RLS-bound
@@ -109,8 +115,8 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
 
   const computed = useMemo(() => {
     if (isLocked) return quote.computed_snapshot;
-    return computeQuote({ guests, stops }, lodgesById);
-  }, [isLocked, quote.computed_snapshot, guests, stops, lodgesById]);
+    return computeQuote({ guests, stops, extras }, lodgesById);
+  }, [isLocked, quote.computed_snapshot, guests, stops, extras, lodgesById]);
 
   function addStop() {
     setStops((s) => [...s, newStop(null)]);
@@ -156,6 +162,7 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
       traveler_id: travelerId || null,
       guests,
       stops: stops.map(({ key, ...rest }) => rest), // strip client-only React key
+      extras,
     };
     if (nextStatus === "confirmed") {
       payload.status = "confirmed";
@@ -166,6 +173,37 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
     setSaving(false);
     if (error) setMessage(`Error: ${error.message}`);
     else setMessage(nextStatus === "confirmed" ? "Confirmed — price is now locked." : "Draft saved.");
+  }
+
+  function handleDownloadPdf() {
+    downloadQuotePdf({ computed, clientName, numGuests, stops, companyName: isDemo ? "" : companyName });
+  }
+
+  async function handleExportExcel() {
+    setExporting(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/quotes/${quote.id}/export-xlsx`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setMessage(body.error || "Could not export to Excel.");
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="([^"]+)"/);
+      const filename = match ? match[1] : "SafariQuote.xlsx";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -337,6 +375,28 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
                         </div>
                       </div>
                     )}
+
+                    <div className="mb-2">
+                      <label className="block text-xs font-medium text-neutral-600 mb-1">Car hire at this stop</label>
+                      {stop.carHire ? (
+                        <CarHirePicker
+                          value={stop.carHire}
+                          disabled={isLocked}
+                          onChange={(next) => updateStop(stop.key, { carHire: next })}
+                          onRemove={() => updateStop(stop.key, { carHire: null })}
+                        />
+                      ) : (
+                        !isLocked && (
+                          <button
+                            type="button"
+                            onClick={() => updateStop(stop.key, { carHire: {} })}
+                            className="text-xs text-neutral-600 border border-dashed border-neutral-300 rounded-lg w-full py-1.5 hover:bg-neutral-50"
+                          >
+                            + Add car hire
+                          </button>
+                        )
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -349,6 +409,8 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
             + Add stop
           </button>
         )}
+
+        <ExtrasPanel extras={extras} onChange={setExtras} isLocked={isLocked} numGuests={numGuests} />
       </div>
 
       <div className="col-span-1">
@@ -358,16 +420,21 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
             <p className="text-sm text-neutral-400">Add a stop to see pricing.</p>
           ) : (
             <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
-              {computed.lines.map((line, i) =>
-                line.stopSec ? (
-                  <div key={i} className="text-xs font-semibold text-neutral-400 uppercase pt-2">{line.label}</div>
-                ) : (
+              {computed.lines.map((line, i) => {
+                if (line.zero) return null;
+                if (line.stopSec) {
+                  return <div key={i} className="text-xs font-semibold text-neutral-400 uppercase pt-2">{line.label}</div>;
+                }
+                if (line.sec) {
+                  return <div key={i} className="text-xs font-semibold text-amber-700 uppercase pt-3 border-t border-neutral-100 mt-1">{line.sec}</div>;
+                }
+                return (
                   <div key={i} className="flex justify-between text-sm">
                     <span className="text-neutral-600">{line.label}<br /><span className="text-xs text-neutral-400">{line.detail}</span></span>
                     <span className="text-neutral-900 font-medium whitespace-nowrap">{fmtNAD(line.sto)}</span>
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           )}
           <div className="border-t border-neutral-200 pt-3 space-y-1">
@@ -394,6 +461,16 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
               Confirmed {quote.confirmed_at ? new Date(quote.confirmed_at).toLocaleDateString() : ""} — price is locked and won't change if lodge rates update later.
             </p>
           )}
+          <div className="mt-2 space-y-2">
+            <button onClick={handleDownloadPdf} disabled={!computed || !computed.rackTotal}
+              className="w-full border border-neutral-300 text-neutral-700 text-sm py-2 rounded-lg disabled:opacity-50">
+              Download PDF
+            </button>
+            <button onClick={handleExportExcel} disabled={exporting}
+              className="w-full border border-neutral-300 text-neutral-700 text-sm py-2 rounded-lg disabled:opacity-50">
+              {exporting ? "Preparing…" : "Export to Excel (rack + STO)"}
+            </button>
+          </div>
           {message && <p className="text-xs text-neutral-500 mt-3">{message}</p>}
         </div>
       </div>
