@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPlan } from "@/lib/plans";
+import { resolveSignupPlan } from "@/lib/plans";
 
 // Public "Sign up" entry point, linked from the marketing site (the "Become
 // a Member" buttons on the Wix Plans & Pricing page link here as
@@ -27,7 +27,7 @@ async function startSignup(formData) {
   const contactEmail = (formData.get("contactEmail") || "").toString().trim().toLowerCase();
   const phone = (formData.get("phone") || "").toString().trim();
   const planKey = (formData.get("plan") || "").toString().trim();
-  const plan = getPlan(planKey);
+  const plan = resolveSignupPlan(planKey);
 
   if (!companyName || !contactName || !contactEmail || !contactEmail.includes("@")) {
     redirect(`/signup?error=invalid${plan ? `&plan=${plan.key}` : ""}`);
@@ -64,7 +64,7 @@ async function startSignup(formData) {
 export default async function SignupPage({ searchParams }) {
   const params = await searchParams;
   const error = params?.error;
-  const plan = getPlan(params?.plan);
+  const plan = resolveSignupPlan(params?.plan);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4">
@@ -75,6 +75,11 @@ export default async function SignupPage({ searchParams }) {
         </p>
         {plan && (
           <p className="text-sm bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 mb-4 text-neutral-700">
+            {plan.key === "beta" && (
+              <>
+                <span className="font-medium">Congratulations, you are signing up for the Beta Tester Plan!</span>{" "}
+              </>
+            )}
             You&apos;re signing up for the <span className="font-medium">{plan.label}</span> plan
             {" "}&mdash; {plan.price} {plan.period}.
           </p>
