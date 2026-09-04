@@ -211,6 +211,78 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
     }
   }
 
+  // ── Download / upload this quote as a plain .json file ─────────────────
+  // Ported from the master file's exportCurrentQuote()/importQuoteFile() —
+  // a portable backup/transfer format independent of Supabase, with no
+  // sign-in or cloud API of its own. The user saves the downloaded file
+  // wherever they like (their own Dropbox, Google Drive, a local folder —
+  // whichever is already synced/signed-in on their computer) and can load
+  // it back in here or on another device/account later.
+  function _safeFilename(str) {
+    return str.replace(/[/\\:*?"<>|]/g, "_").replace(/\s+/g, " ").trim();
+  }
+
+  function handleDownloadQuoteFile() {
+    const state = {
+      version: "safariquote-quote-v1",
+      exportedAt: new Date().toISOString(),
+      clientName,
+      travelerId,
+      numGuests,
+      stops,
+      extras,
+    };
+    const datePart = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).replace(/ /g, "-");
+    const baseName = clientName?.trim() ? _safeFilename(clientName.trim()) + " — " + datePart : "Quote — " + datePart;
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${baseName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setMessage(`Downloaded ${baseName}.json`);
+  }
+
+  function handleImportQuoteFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      let data;
+      try {
+        data = JSON.parse(ev.target.result);
+      } catch {
+        setMessage("Could not read that file — is it a valid quote .json?");
+        return;
+      }
+      const looksValid = data && (data.stops !== undefined || data.clientName !== undefined);
+      if (!looksValid) {
+        setMessage("That file doesn't look like a SafariQuote quote — check it's the right one.");
+        return;
+      }
+      setClientName(typeof data.clientName === "string" ? data.clientName : "");
+      setTravelerId(typeof data.travelerId === "string" ? data.travelerId : "");
+      setNumGuests(Number.isFinite(data.numGuests) && data.numGuests > 0 ? data.numGuests : 2);
+      const importedStops = Array.isArray(data.stops) ? data.stops : [];
+      setStops(importedStops);
+      setExtras(data.extras && typeof data.extras === "object" ? data.extras : emptyExtras());
+      // Mirror the initial-load effect: pre-fetch each referenced lodge so
+      // room/activity/pricing details render immediately, not just after
+      // the user re-touches each stop's Lodge dropdown.
+      const importedLodgeIds = [...new Set(importedStops.map((s) => s.lodgeId).filter(Boolean))];
+      importedLodgeIds.forEach((id) => {
+        ensureLodgeLoaded(id);
+        ensureMyRateLoaded(id);
+      });
+      setMessage(`Loaded ${file.name} — review and Save draft to keep it.`);
+    };
+    reader.readAsText(file);
+  }
+
   return (
     <div className="grid grid-cols-3 gap-8">
       <div className="col-span-2 space-y-6">
@@ -475,6 +547,21 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
               className="w-full border border-neutral-300 text-neutral-700 text-sm py-2 rounded-lg disabled:opacity-50">
               {exporting ? "Preparing…" : "Export to Excel (rack + STO)"}
             </button>
+          </div>
+          <div className="mt-2 pt-2 border-t border-neutral-100 space-y-2">
+            <button onClick={handleDownloadQuoteFile}
+              className="w-full border border-neutral-300 text-neutral-700 text-sm py-2 rounded-lg">
+              Download quote (.json)
+            </button>
+            {!isLocked && (
+              <label className="w-full block text-center cursor-pointer border border-dashed border-neutral-300 text-neutral-600 text-sm py-2 rounded-lg hover:bg-neutral-50">
+                Upload quote (.json)
+                <input type="file" accept=".json,application/json" onChange={handleImportQuoteFile} className="hidden" />
+              </label>
+            )}
+            <p className="text-xs text-neutral-400">
+              Save the file to your own Dropbox, Google Drive, or computer — load it back in here anytime.
+            </p>
           </div>
           {message && <p className="text-xs text-neutral-500 mt-3">{message}</p>}
         </div>
