@@ -65,15 +65,20 @@ export default function QuoteBuilder({ quote, lodgeList, travelers, tenantStoDis
         const res = await fetch(`/api/demo-lodge/${encodeURIComponent(lodgeId)}`);
         if (res.ok) {
           const data = await res.json();
-          setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
-          return data.data;
+          // `data.name` lives alongside (not inside) `data.data` — merge it
+          // in so pricing.js's `lodge.name` (used in the price-breakdown
+          // labels) isn't left undefined.
+          const merged = { ...data.data, name: data.name };
+          setLodgesById((prev) => ({ ...prev, [lodgeId]: merged }));
+          return merged;
         }
         return null;
       }
       const { data } = await supabase.from("lodges").select("id, name, data").eq("id", lodgeId).single();
       if (data) {
-        setLodgesById((prev) => ({ ...prev, [lodgeId]: data.data }));
-        return data.data;
+        const merged = { ...data.data, name: data.name };
+        setLodgesById((prev) => ({ ...prev, [lodgeId]: merged }));
+        return merged;
       }
       return null;
     },
