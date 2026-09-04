@@ -9,9 +9,10 @@
 // (admin preview, confirm-time snapshot) and in the browser (live quote
 // builder), and can be unit tested.
 //
-// NOT YET PORTED (v1 scope — see project handover notes): standalone car
-// hire, transfers, meet & greet, FlyNamibia sectors, custom extras, and
-// Excel/PDF export. Those are the next layer to add on top of this core.
+// Standalone car hire, transfers, meet & greet, FlyNamibia sectors, and
+// custom extras now live in lib/extras.js and are merged into computeQuote()
+// below. Excel/PDF export live in lib/quoteExportXlsx.js and
+// app/quotes/[id]/quotePdf.js.
 //
 // lodge shape expected here (== `lodges.data` JSONB column, plus a few
 // promoted columns merged in — see lib/lodgeRecord.js):
@@ -19,6 +20,9 @@
 //     mealRates, seasons:[{id,label}], rooms:[...], activities:[...],
 //     autoSeasonFnSource: "<js source>" }
 // ============================================================================
+
+import { computeExtras } from "./extras";
+import { CAR_HIRE_COMPANIES } from "./carHireRates";
 
 const NAD_PER_UNIT_DEFAULT = {
   NAD: 1,
@@ -160,7 +164,16 @@ export function computeStopLines(stop, lodge, numGuests, nadPerUnit = NAD_PER_UN
   const room = lodge.rooms[stop.roomIndex];
   if (!room) return { lines, rack, sto };
 
-  const season = stop.seasonId || resolveSeasonFromCheckin(lodge, stop.checkin, autoSeasonFn) || lodge.seasons[0]?.id;
+  // Non-seasonal lodges store their only rate under the "flat" key and have
+  // an empty `seasons` array (nothing to auto-detect or fall back to via
+  // lodge.seasons[0]). Without this last-resort fallback, `season` stays
+  // null/undefined and getEffectiveRates() returns null, silently pricing
+  // the whole stop at zero even though the lodge and room are fully valid.
+  const season =
+    stop.seasonId ||
+    resolveSeasonFromCheckin(lodge, stop.checkin, autoSeasonFn) ||
+    lodge.seasons[0]?.id ||
+    (room.rates && room.rates.flat ? "flat" : null);
   const numRooms = Math.max(1, stop.numRooms || 1);
 
   let nights = 1;
@@ -227,7 +240,7 @@ export function computeStopLines(stop, lodge, numGuests, nadPerUnit = NAD_PER_UN
   const rType = isPerSuite || isPerRoom ? "rm" : "pp";
   const unitStr = isPerSuite || isPerRoom ? numRooms : stopPax;
   const sLabel =
-    ((lodge.seasons.find((s) => s.id === season)?.label || season).split("(")[0].trim()) +
+    (((lodge.seasons || []).find((s) => s.id === season)?.label || season || "flat").split("(")[0].trim()) +
     (rates.estimated ? " ⚠ EST" : "") +
     (fx !== 1 ? ` ⚠ FX ${lodgeCur}→NAD @${fx.toFixed(2)}` : "");
 
@@ -344,6 +357,13 @@ export function computeQuote(quote, lodgesById) {
     grandRack += rack;
     grandSto += sto;
   }
+
+  // Car hire, FlyNamibia sectors, meet & greet, and itinerary extras — a
+  // pure function of quote.extras + quote.stops, see lib/extras.js.
+  const extrasResult = computeExtras(quote.extras, quote.stops, numGuests, CAR_HIRE_COMPANIES);
+  allLines.push(...extrasResult.lines);
+  grandRack += extrasResult.rackTotal;
+  grandSto += extrasResult.stoTotal;
 
   const margin = grandRack - grandSto;
   const marginPct = grandRack > 0 ? (margin / grandRack) * 100 : 0;
