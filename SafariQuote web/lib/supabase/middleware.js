@@ -40,7 +40,7 @@ export async function updateSession(request) {
                                                                                             pathname === "/" ||
                                                                                             pathname.startsWith("/auth") ||
                                                                                             pathname === "/trial" || // public instant-trial auto-login, see app/trial/route.js
-                                                                                            pathname === "/signup"; // public paid-signup form, see app/signup/page.js
+                                                                                            pathname.startsWith("/signup"); // public paid-signup form + payment-details/thank-you, see app/signup/
 
   if (!user && !isPublic) {
                 const url = request.nextUrl.clone();
