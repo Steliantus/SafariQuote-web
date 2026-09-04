@@ -75,13 +75,17 @@ export default async function SignupPage({ searchParams }) {
         </p>
         {plan && (
           <p className="text-sm bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 mb-4 text-neutral-700">
-            {plan.key === "beta" && (
+            {plan.key === "beta" ? (
               <>
-                <span className="font-medium">Congratulations, you are signing up for the Beta Tester Plan!</span>{" "}
+                <span className="font-medium">Congratulations, you are signing up for the Beta Tester Plan!</span>
+                {" "}&mdash; {plan.price} {plan.period}.
+              </>
+            ) : (
+              <>
+                You&apos;re signing up for the <span className="font-medium">{plan.label}</span> plan
+                {" "}&mdash; {plan.price} {plan.period}.
               </>
             )}
-            You&apos;re signing up for the <span className="font-medium">{plan.label}</span> plan
-            {" "}&mdash; {plan.price} {plan.period}.
           </p>
         )}
         {error && (
