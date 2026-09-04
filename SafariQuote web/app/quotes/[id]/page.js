@@ -7,7 +7,15 @@ export default async function QuotePage({ params }) {
     const { id } = await params;
     const supabase = await createClient();
 
-  const [{ data: quote }, { data: travelers }, { data: profile }] = await Promise.all([
+  // NOTE: the third entry here resolves directly to `null` or a plain
+  // {tenantId, sto_discount_pct, is_master_rate_source} object -- unlike the
+  // first two, it is NOT a Supabase {data, error} result. Destructure it as
+  // `profile` directly (not `{ data: profile }`); the latter silently reads
+  // a nonexistent `.data` property and evaluates to `undefined`, which was a
+  // real bug here: it broke demo-tenant detection below (isDemoTenant(undefined)
+  // is always false), which in turn dropped the trial out of its frozen demo
+  // lodge dataset and into the live production `lodges` table instead.
+  const [{ data: quote }, { data: travelers }, profile] = await Promise.all([
         supabase.from("quotes").select("*").eq("id", id).single(),
         supabase.from("travelers").select("id, name").order("name"),
         supabase.auth.getUser().then(async ({ data }) => {
