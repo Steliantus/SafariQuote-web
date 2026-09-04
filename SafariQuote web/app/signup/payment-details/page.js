@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPlan } from "@/lib/plans";
+import { resolveSignupPlan } from "@/lib/plans";
 
 // Shown right after someone submits the /signup form. We're not routing
 // payment through PayPal/Wix Pricing Plans checkout right now (PayPal's
@@ -18,7 +18,7 @@ const CONTACT_PHONE = "+264 81 872 6815";
 
 export default async function PaymentDetailsPage({ searchParams }) {
   const params = await searchParams;
-  const plan = getPlan(params?.plan);
+  const plan = resolveSignupPlan(params?.plan);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-12">
@@ -30,6 +30,11 @@ export default async function PaymentDetailsPage({ searchParams }) {
 
         {plan && (
           <p className="text-sm bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 mb-6 text-neutral-700">
+            {plan.key === "beta" && (
+              <>
+                <span className="font-medium">Congratulations, you are signing up for the Beta Tester Plan!</span>{" "}
+              </>
+            )}
             <span className="font-medium">{plan.label}</span> plan &mdash; {plan.price}{" "}
             {plan.period}
           </p>
